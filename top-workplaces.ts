@@ -1,5 +1,7 @@
 export {};
+
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
+const ACTIVE_STATUS = 0;
 
 type ShiftDTO = {
   id: number;
@@ -49,7 +51,9 @@ async function main(): Promise<void> {
   const workplacesPayload = await fetchJson<ApiEnvelope<WorkplaceDTO[]>>(
     `${API_BASE_URL}/workplaces`,
   );
-  const workplaces = unwrap(workplacesPayload).filter((w) => w.status === 0);
+  const workplaces = unwrap(workplacesPayload).filter(
+    (workplace) => workplace.status === ACTIVE_STATUS,
+  );
 
   const activeWorkplaceById = new Map<number, string>(
     workplaces.map((workplace) => [workplace.id, workplace.name]),
@@ -79,9 +83,9 @@ async function main(): Promise<void> {
         .localeCompare(activeWorkplaceById.get(b[0])!);
     })
     .slice(0, 3)
-    .map(([workplaceId, shifts]) => ({
+    .map(([workplaceId, shiftsCount]) => ({
       name: activeWorkplaceById.get(workplaceId)!,
-      shifts,
+      shifts: shiftsCount,
     }));
 
   process.stdout.write(`${JSON.stringify(topWorkplaces, null, 2)}\n`);

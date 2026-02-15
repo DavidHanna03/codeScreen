@@ -1,0 +1,92 @@
+export {};
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
+
+type ShiftDTO = {
+  id: number;
+  workplaceId: number;
+  workerId: number | null;
+  startAt: string;
+  endAt: string;
+  cancelledAt: string | null;
+};
+
+type WorkplaceDTO = {
+  id: number;
+  name: string;
+  status: number;
+};
+
+type ApiEnvelope<T> = { data: T } | T;
+
+function unwrap<T>(payload: ApiEnvelope<T>): T {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return (payload as { data: T }).data;
+  }
+
+  return payload as T;
+}
+
+function isCompletedShift(shift: ShiftDTO, nowMs: number): boolean {
+  if (shift.workerId == null) return false;
+  if (shift.cancelledAt != null) return false;
+
+  const endMs = Date.parse(shift.endAt);
+  return Number.isFinite(endMs) && endMs <= nowMs;
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status}) for ${url}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+async function main(): Promise<void> {
+  const nowMs = Date.now();
+
+  const workplacesPayload = await fetchJson<ApiEnvelope<WorkplaceDTO[]>>(
+    `${API_BASE_URL}/workplaces`,
+  );
+  const workplaces = unwrap(workplacesPayload).filter((w) => w.status === 0);
+
+  const activeWorkplaceById = new Map<number, string>(
+    workplaces.map((workplace) => [workplace.id, workplace.name]),
+  );
+
+  const shiftsPayload = await fetchJson<ApiEnvelope<ShiftDTO[]>>(
+    `${API_BASE_URL}/shifts`,
+  );
+  const shifts = unwrap(shiftsPayload);
+
+  const counts = new Map<number, number>();
+
+  for (const shift of shifts) {
+    if (!isCompletedShift(shift, nowMs)) continue;
+    if (!activeWorkplaceById.has(shift.workplaceId)) continue;
+
+    counts.set(shift.workplaceId, (counts.get(shift.workplaceId) ?? 0) + 1);
+  }
+
+  const topWorkplaces = [...counts.entries()]
+    .sort((a, b) => {
+      const shiftDiff = b[1] - a[1];
+      if (shiftDiff !== 0) return shiftDiff;
+
+      return activeWorkplaceById
+        .get(a[0])!
+        .localeCompare(activeWorkplaceById.get(b[0])!);
+    })
+    .slice(0, 3)
+    .map(([workplaceId, shifts]) => ({
+      name: activeWorkplaceById.get(workplaceId)!,
+      shifts,
+    }));
+
+  process.stdout.write(`${JSON.stringify(topWorkplaces, null, 2)}\n`);
+}
+
+void main().catch(() => {
+  process.exitCode = 1;
+});

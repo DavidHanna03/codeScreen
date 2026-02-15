@@ -1,0 +1,32 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE files
+/.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+
+# Build outputs and dependencies
+/dist
+/node_modules
+/coverage
+/build
+/.next
+
+# All projects
+**/node_modules
+**/dist
+**/.env
+**/*.log
+**/coverage
+
+/test/ctrf
+/test/junit
